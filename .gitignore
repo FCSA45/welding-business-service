@@ -1,0 +1,39 @@
+# Local secrets and environment files
+.env
+.env.*
+!.env.example
+!deploy/*.example
+
+# Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Runtime files
+.runtime-tmp/
+*.log
+*.pid
+*.tmp
+
+# Local databases and generated artifacts
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+data/generated_reports/
+data/models/
+docx_qa/
+
+# Build/install metadata
+*.egg-info/
+dist/
+build/
+
+# IDE and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

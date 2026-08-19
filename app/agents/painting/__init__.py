@@ -1,0 +1,1 @@
+"""Painting department agent definition."""

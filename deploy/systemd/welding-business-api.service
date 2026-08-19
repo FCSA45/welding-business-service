@@ -1,0 +1,22 @@
+[Unit]
+Description=Welding business API (optional channel/API runtime)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=welding
+Group=welding
+WorkingDirectory=/opt/welding-business-service
+EnvironmentFile=/etc/welding-business-service/api.env
+ExecStart=/usr/bin/env bash /opt/welding-business-service/scripts/start_api.sh
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/welding-business-service/data /opt/welding-business-service/logs
+
+[Install]
+WantedBy=multi-user.target

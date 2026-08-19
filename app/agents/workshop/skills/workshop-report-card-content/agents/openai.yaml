@@ -1,0 +1,4 @@
+interface:
+  display_name: "车间报表卡片内容"
+  short_description: "Create accurate workshop plan and work-report Feishu cards"
+  default_prompt: "Use $workshop-report-card-content to produce a concise workshop plan or work-report Feishu card from validated metrics."

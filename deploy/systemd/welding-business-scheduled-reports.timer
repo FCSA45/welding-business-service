@@ -1,0 +1,10 @@
+[Unit]
+Description=Run welding and painting daily reports every day at 08:30 China Standard Time
+
+[Timer]
+OnCalendar=*-*-* 08:30:00 Asia/Shanghai
+Persistent=true
+Unit=welding-business-scheduled-reports.service
+
+[Install]
+WantedBy=timers.target

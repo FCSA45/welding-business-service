@@ -1,0 +1,17 @@
+[Unit]
+Description=Send welding and painting daily reports to WeCom
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=welding
+Group=welding
+WorkingDirectory=/opt/welding-business-service
+EnvironmentFile=/etc/welding-business-service/mcp.env
+ExecStart=/usr/bin/env bash /opt/welding-business-service/scripts/run_scheduled_reports.sh
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/welding-business-service/data /opt/welding-business-service/logs
