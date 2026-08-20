@@ -116,6 +116,34 @@ PYTHONIOENCODING=utf-8
 
 MCP 使用 `stdio`，不需要为 MCP 单独开放公网端口。部门范围由专用启动入口固定：焊接入口不注册油漆工具，油漆入口不注册焊接工具；即使客户端错误调用，后端也会返回 403。
 
+### Hermes + 腾讯云部署边界
+
+腾讯云上的正式形态是 **Hermes 管理企业微信机器人、模型、会话记忆、知识库和最终答复**；本仓库只作为 Hermes 启动的只读业务 MCP。
+
+- 不部署 `welding-business-api.service`，也不启动本项目的企业微信长连接。
+- 不填写 `CHERRY_AGENT_*`，不需要部署 Cherry。
+- MCP-only 环境不填写 `HERMES_AGENT_URL` 或 `HERMES_AGENT_API_KEY`；这是可选 HTTP/API 反向调用模式的配置，不是 Hermes 调用 MCP 所需的凭据。
+- 保持所有 `*_WECOM_AIBOT_ENABLED=false`，并保持 `WORKSHOP_SCHEDULED_REPORT_ENABLED=false`，除非以后明确启用由本服务直连企业微信的定时推送。
+- `WECOM_CORP_ID`、`WECOM_CORP_SECRET` 仍需填写：它们仅用于按 Hermes 传入的 `requester_id`/`chat_id` 实时校验员工部门，不用于机器人连接。Hermes 的 MCP 配置必须可靠地传入这些身份参数。
+
+在 Hermes 中为每个部门配置一个独立的 stdio MCP Server：
+
+```text
+# 焊接部智能体
+/opt/welding-business-service/.venv/bin/hermes-welding-mcp-welding
+
+# 油漆部智能体
+/opt/welding-business-service/.venv/bin/hermes-welding-mcp-painting
+```
+
+两者的工作目录均为 `/opt/welding-business-service`，环境变量均为：
+
+```text
+APP_ENV_FILE=/etc/welding-business-service/mcp.env
+PYTHONUTF8=1
+PYTHONIOENCODING=utf-8
+```
+
 本地 Cherry 也按相同原则配置：焊接部智能体命令填写 `C:\Users\Administrator\Desktop\welding-business-service\start_welding_mcp.cmd`，油漆部智能体命令填写 `C:\Users\Administrator\Desktop\welding-business-service\start_painting_mcp.cmd`。两边都删除原先通用的 `hermes-welding-mcp.exe` MCP 配置，再断开并重新开启 MCP。
 
 ## 四、更新版本
@@ -165,7 +193,9 @@ bash scripts/start_api.sh
 
 焊接部智能体绑定共享库和焊接部库，油漆部智能体绑定共享库和油漆部库。订单、报工、人员和完成公分等实时数字必须调用 MCP 查询，不能依赖知识库中的静态文件。知识库内容更新时，先在 Git 中审核和提交，再在 Hermes 中重新上传或使用其同步能力更新。
 
-## 八、每天 08:30 定时日报
+## 八、可选：本服务直连企业微信的每天 08:30 定时日报
+
+Hermes 一键连接企业微信的部署不启用本节功能：保持 `WORKSHOP_SCHEDULED_REPORT_ENABLED=false`，由 Hermes 自己处理机器人消息和定时能力。本节仅适用于以后明确需要由本服务持有独立企业微信 AIBot 凭据并直接向群发送日报的场景。
 
 定时任务默认按 `Asia/Shanghai` 每天 08:30 运行，日报统计前一天。它分别生成焊接部、油漆部的订单日报 PNG 和报工日报 PNG，并向配置的企业微信群发送简短文字摘要和图片；不会发送 HTML 文件。HTML 会留存在 `data/generated_reports/workshop/scheduled/`，用于追溯和重新渲染。
 
