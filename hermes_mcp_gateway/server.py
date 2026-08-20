@@ -8,11 +8,14 @@ from __future__ import annotations
 
 import logging
 import os
+import secrets
 from datetime import date
 from typing import Any
 from uuid import uuid4
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
+from starlette.responses import JSONResponse
 
 from app.business_routing.intents import BusinessIntent
 from app.business_routing.models import BusinessRequest, RequestContext
@@ -42,6 +45,67 @@ AGENT_ID = "workshop-agent"
 PAINTING_AGENT_ID = "painting-agent"
 DEFAULT_TEST_REQUESTER = "cherry-test-user"
 DEFAULT_TEST_CHAT = "cherry-test-chat"
+
+
+class _BearerTokenMiddleware:
+    """Protect the optional remote Streamable HTTP transport."""
+
+    def __init__(self, app, token: str) -> None:
+        self.app = app
+        self.token = token
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+        headers = dict(scope.get("headers", []))
+        authorization = headers.get(b"authorization", b"").decode("latin-1")
+        if not secrets.compare_digest(authorization, f"Bearer {self.token}"):
+            response = JSONResponse(
+                {"error": "MCP bearer token is required."},
+                status_code=401,
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+            await response(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
+
+
+def _http_values(name: str) -> list[str]:
+    return [item.strip() for item in os.getenv(name, "").split(",") if item.strip()]
+
+
+def _run_streamable_http() -> None:
+    import uvicorn
+
+    token = os.getenv("MCP_HTTP_BEARER_TOKEN", "").strip()
+    if not token:
+        raise SystemExit("MCP_HTTP_BEARER_TOKEN is required for streamable-http.")
+    host = os.getenv("MCP_HTTP_HOST", "127.0.0.1").strip()
+    if host not in {"127.0.0.1", "localhost", "::1"}:
+        raise SystemExit("MCP_HTTP_HOST must be a loopback address.")
+    try:
+        port = int(os.getenv("MCP_HTTP_PORT", "28181"))
+    except ValueError as exc:
+        raise SystemExit("MCP_HTTP_PORT must be an integer.") from exc
+    if not 1024 <= port <= 65535:
+        raise SystemExit("MCP_HTTP_PORT must be between 1024 and 65535.")
+    path = os.getenv("MCP_HTTP_PATH", "/mcp").strip()
+    allowed_hosts = _http_values("MCP_HTTP_ALLOWED_HOSTS")
+    if not path.startswith("/") or path == "/":
+        raise SystemExit("MCP_HTTP_PATH must be a non-root path.")
+    if not allowed_hosts:
+        raise SystemExit("MCP_HTTP_ALLOWED_HOSTS is required behind HTTPS proxy.")
+    mcp.settings.host = host
+    mcp.settings.port = port
+    mcp.settings.streamable_http_path = path
+    mcp.settings.transport_security = TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=["127.0.0.1:*", "localhost:*", "[::1]:*", *allowed_hosts],
+        allowed_origins=_http_values("MCP_HTTP_ALLOWED_ORIGINS"),
+    )
+    application = _BearerTokenMiddleware(mcp.streamable_http_app(), token)
+    uvicorn.run(application, host=host, port=port, log_level=os.getenv("LOG_LEVEL", "info").lower())
 
 _SCOPE_ALIASES = {
     "welding": WELDING_DEPARTMENT,
@@ -607,6 +671,9 @@ def main() -> None:
     """Start the stable MCP process entrypoint used by Cherry and Hermes."""
     logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
     transport = os.getenv("MCP_TRANSPORT", "stdio").strip().lower() or "stdio"
+    if transport == "streamable-http":
+        _run_streamable_http()
+        return
     mcp.run(transport)
 
 

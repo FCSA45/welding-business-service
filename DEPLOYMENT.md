@@ -45,7 +45,7 @@ git diff --check
 
 ## 二、服务器首次安装
 
-以下命令适用于 Ubuntu/Debian 类 Linux 服务器。服务器需要预先安装 Git、Python 3.12 和 Python 虚拟环境组件：
+以下命令适用于独占的 Ubuntu/Debian 类 Linux 服务器。服务器需要预先安装 Git、Python 3.12 和 Python 虚拟环境组件：
 
 ```bash
 sudo mkdir -p /opt
@@ -56,6 +56,18 @@ bash scripts/bootstrap_linux.sh
 ```
 
 不要把 `.venv` 从 Windows 上传到服务器。服务器必须使用 Linux 自己创建的虚拟环境。
+
+共用服务器上，请只使用自己的家目录，不创建或修改 `/opt`、`/etc`、systemd 服务或同事的反向代理配置：
+
+```bash
+mkdir -p ~/welding-business-service
+git clone <你的私有仓库地址> ~/welding-business-service
+cd ~/welding-business-service
+bash scripts/bootstrap_linux.sh
+install -d -m 700 ~/.config/welding-business-service
+cp deploy/mcp.env.example ~/.config/welding-business-service/mcp.env
+chmod 600 ~/.config/welding-business-service/mcp.env
+```
 
 ## 三、无数据库 MCP 配置
 
@@ -113,6 +125,35 @@ APP_ENV_FILE=/etc/welding-business-service/mcp.env
 PYTHONUTF8=1
 PYTHONIOENCODING=utf-8
 ```
+
+### Hermes 远程 HTTP MCP（仅当连接器不支持 stdio）
+
+如果 Hermes 的连接器只能填写 `SSE` 或 `HTTP Streamable` URL，可启用本项目的远程 Streamable HTTP 模式。焊接和油漆仍是两个独立进程，默认只监听本机 `127.0.0.1:28181` 与 `127.0.0.1:28182`，不会直接暴露公网。部署前先检查这两个端口是否已被同事使用；如有冲突，只需为自己的启动命令设置另一组未占用端口。
+
+在私有 `mcp.env` 中为两个部门分别设置不同的随机 Bearer Token，并填写反向代理域名：
+
+```dotenv
+WELDING_MCP_HTTP_BEARER_TOKEN=<焊接专用长随机字符串>
+PAINTING_MCP_HTTP_BEARER_TOKEN=<油漆专用长随机字符串>
+MCP_HTTP_ALLOWED_HOSTS=mcp.example.com
+MCP_HTTP_ALLOWED_ORIGINS=https://你的Hermes控制台域名
+```
+
+通过 HTTPS 反向代理将两个本机端点发布为不同路径，例如：
+
+```text
+https://mcp.example.com/welding/mcp  ->  127.0.0.1:28181/mcp
+https://mcp.example.com/painting/mcp ->  127.0.0.1:28182/mcp
+```
+
+启动命令：
+
+```bash
+APP_ENV_FILE=~/.config/welding-business-service/mcp.env scripts/start_welding_mcp_http.sh
+APP_ENV_FILE=~/.config/welding-business-service/mcp.env scripts/start_painting_mcp_http.sh
+```
+
+Hermes 中选择 `HTTP Streamable`，填写对应 HTTPS URL，认证方式选择 `Bearer Token`。焊接智能体只填写 `WELDING_MCP_HTTP_BEARER_TOKEN`，油漆智能体只填写 `PAINTING_MCP_HTTP_BEARER_TOKEN`。
 
 MCP 使用 `stdio`，不需要为 MCP 单独开放公网端口。部门范围由专用启动入口固定：焊接入口不注册油漆工具，油漆入口不注册焊接工具；即使客户端错误调用，后端也会返回 403。
 

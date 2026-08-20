@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export MCP_DEPARTMENT_SCOPE=welding
+export MCP_TRANSPORT=streamable-http
+export MCP_HTTP_PORT="${MCP_HTTP_PORT:-28181}"
+export MCP_HTTP_PATH="${MCP_HTTP_PATH:-/mcp}"
+if [[ -z "${WELDING_MCP_HTTP_BEARER_TOKEN:-}" ]]; then
+  echo "WELDING_MCP_HTTP_BEARER_TOKEN is required." >&2
+  exit 2
+fi
+export MCP_HTTP_BEARER_TOKEN="$WELDING_MCP_HTTP_BEARER_TOKEN"
+exec "$ROOT_DIR/scripts/start_mcp.sh"
