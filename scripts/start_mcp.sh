@@ -12,6 +12,17 @@ if [[ -z "${APP_ENV_FILE:-}" && -f /etc/welding-business-service/mcp.env ]]; the
   export APP_ENV_FILE=/etc/welding-business-service/mcp.env
 fi
 
+if [[ -n "${APP_ENV_FILE:-}" ]]; then
+  if [[ ! -r "$APP_ENV_FILE" ]]; then
+    echo "MCP environment file is not readable: $APP_ENV_FILE" >&2
+    exit 1
+  fi
+  set -a
+  # shellcheck disable=SC1090
+  . "$APP_ENV_FILE"
+  set +a
+fi
+
 case "${MCP_DEPARTMENT_SCOPE:-}" in
   welding)
     MCP_BIN="$ROOT_DIR/.venv/bin/hermes-welding-mcp-welding"
